@@ -1,9 +1,6 @@
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Scanner;
+import java.util.*;
 
 //the main class that manage the game
 public class Dealer extends Thread {
@@ -79,6 +76,95 @@ public class Dealer extends Thread {
         }
     }
 
+
+    //init and return the prices for each item
+    private int[] getPricesArray(int n, int m, int x, int y){
+        Random random = new Random();
+        int numOfItems = random.nextInt((m - n) + 1) + n;
+//        int numOfItems = (int) ((Math.random() * (m - n)) + n);
+        int[] prices = new int[numOfItems];
+        System.out.println("Auction items: ");
+        for(int i=0; i<prices.length; i++){
+            int currentPrice = round(random.nextInt((y - x) + 1) + x);
+//            int currentPrice = (((int) ((Math.random() * (y - x)) + x)+5)/10)*10;
+            prices[i] = currentPrice;
+            System.out.format("%6S %3S %5S", "Item" + (i+1+historyBids.size()) , " = "+ " $", currentPrice);
+            System.out.println();
+//            System.out.println("Item" + (i+1) + " = " + "$" + currentPrice);
+        }
+        moneyToWallet = new int[prices.length];
+        moneyToWallet[moneyToWallet.length-1] = prices[moneyToWallet.length-1];
+        for(int i=prices.length-2; i>=0 ; i--){
+            moneyToWallet[i] = moneyToWallet[i+1] + prices[i];
+        }
+        return prices;
+    }
+
+    //checking if there at least one player and the game, if not wait for them to connect
+    private void waitingForPlayers() throws InterruptedException {
+        while (activePlayers.size()<1){
+            Thread.sleep(1);
+            ArrayList<Player> waitingPlayers = login.getWaitingPlayers();
+            if(waitingPlayers.size()>0){
+                transferPlayer(waitingPlayers, 0);
+                sendMsgToAllClient("The game will start in 10 seconds");
+                //wait 10 second and check again if new players waiting
+                Thread.sleep(10000);
+                waitingPlayers = login.getWaitingPlayers();
+                if(waitingPlayers.size()>0){
+                    transferPlayer(waitingPlayers, 0);
+                }
+                break;
+            }
+
+        }
+    }
+
+    //send msg for all active players
+    void sendMsgToAllClient(String msg){
+        System.out.println(msg);
+        for(Player p: activePlayers){
+            p.send(msg);
+        }
+    }
+
+    //send each item for bidding war
+    private void miniGame() throws InterruptedException {
+        for(int i=0 ; i<prices.length; i++){
+            Thread.sleep(1);
+            ArrayList<Player> waitingPlayers = login.getWaitingPlayers();
+            if(waitingPlayers.size()>0){
+                transferPlayer(waitingPlayers, i);
+            }
+            biddingWar( prices[i]);
+        }
+
+    }
+
+    //start a bidding war for the given item and waiting 20 sec for bidding
+    private void  biddingWar( int price) throws InterruptedException {
+        sendMsgToAllClient("");
+        itemNumber = 1 + historyBids.size();
+        currentBid = new Bid(price);
+        sendMsgToAllClient("The current item for sale is item " + itemNumber+ " for a starting price of " + price);
+        sendMsgToAllClient("20 seconds left");
+        Thread.sleep(10000);
+        sendMsgToAllClient("10 seconds left");
+        Thread.sleep(10000);
+        historyBids.add(currentBid);
+        if(currentBid.isSold()){
+            Player buyer = currentBid.getBuyer();
+            sendMsgToAllClient(currentBid.getBuyer().getNameString() + " won!");
+            currentBid.getBuyer().setWallet(buyer.getWallet()-currentBid.getSellingPrice());
+        }
+        else {
+            sendMsgToAllClient("item " + itemNumber + " not sold....");
+        }
+
+        currentBid = null;
+
+    }
+
     //print some stat of the game
     private void printStat(){
         sendMsgToAllClient("The game is over");
@@ -124,69 +210,6 @@ public class Dealer extends Thread {
         }
     }
 
-    //checking if there at least one player and the game, if not wait for them to connect
-    private void waitingForPlayers() throws InterruptedException {
-        while (activePlayers.size()<1){
-            Thread.sleep(1);
-            ArrayList<Player> waitingPlayers = login.getWaitingPlayers();
-            if(waitingPlayers.size()>0){
-                transferPlayer(waitingPlayers, 0);
-                sendMsgToAllClient("The game will start in 10 seconds");
-                //wait 10 second and check again if new players waiting
-                Thread.sleep(10000);
-                waitingPlayers = login.getWaitingPlayers();
-                if(waitingPlayers.size()>0){
-                    transferPlayer(waitingPlayers, 0);
-                }
-                break;
-            }
-
-        }
-    }
-
-    //send msg for all active players
-    void sendMsgToAllClient(String msg){
-        System.out.println(msg);
-        for(Player p: activePlayers){
-            p.send(msg);
-        }
-    }
-
-    //send each item for bidding war
-    private void miniGame() throws InterruptedException {
-        for(int i=0 ; i<prices.length; i++){
-            Thread.sleep(1);
-            ArrayList<Player> waitingPlayers = login.getWaitingPlayers();
-            if(waitingPlayers.size()>0){
-                transferPlayer(waitingPlayers, i);
-            }
-            biddingWar(i+1, prices[i]);
-        }
-
-    }
-
-    //start a bidding war for the given item and waiting 20 sec for bidding
-    private void  biddingWar(int item , int price) throws InterruptedException {
-        itemNumber = item;
-        currentBid = new Bid(price);
-        sendMsgToAllClient("The current item for sale is item " + item+ " for a starting price of " + price);
-        sendMsgToAllClient("20 seconds left");
-        Thread.sleep(10000);
-        sendMsgToAllClient("10 seconds left");
-        Thread.sleep(10000);
-        historyBids.add(currentBid);
-        if(currentBid.isSold()){
-            Player buyer = currentBid.getBuyer();
-            sendMsgToAllClient(currentBid.getBuyer().getNameString() + " won!");
-            currentBid.getBuyer().setWallet(buyer.getWallet()-currentBid.getSellingPrice());
-        }
-        else {
-            sendMsgToAllClient("item " + item + " not sold....");
-        }
-
-        currentBid = null;
-
-    }
 
     Bid getCurrentBid(){
         return currentBid;
@@ -286,25 +309,22 @@ public class Dealer extends Thread {
         return itemNumber;
     }
 
-    //init and return the prices for each item
-    private int[] getPricesArray(int n, int m, int x, int y){
-        int numOfItems = (int) ((Math.random() * (m - n)) + n);
-        int[] prices = new int[numOfItems];
-        System.out.println("Auction items: ");
-        for(int i=0; i<prices.length; i++){
-            int currentPrice = (((int) ((Math.random() * (y - x)) + x)+5)/10)*10;
-            prices[i] = currentPrice;
-            System.out.format("%6S %3S %5S", "Item" + (i+1) , " = "+ " $", currentPrice);
-            System.out.println();
-//            System.out.println("Item" + (i+1) + " = " + "$" + currentPrice);
-        }
-        moneyToWallet = new int[prices.length];
-        moneyToWallet[moneyToWallet.length-1] = prices[moneyToWallet.length-1];
-        for(int i=prices.length-2; i>=0 ; i--){
-            moneyToWallet[i] = moneyToWallet[i+1] + prices[i];
-        }
-        return prices;
+
+    private int round(int n) {
+        // Smaller multiple
+        int a = (n / 10) * 10;
+
+        // Larger multiple
+        int b = a + 10;
+
+        // Return of closest of two
+        return (n - a > b - n)? b : a;
     }
+
+
+
+
+
 
 
 

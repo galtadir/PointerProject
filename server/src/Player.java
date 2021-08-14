@@ -48,26 +48,21 @@ public class Player extends Thread {
                     if(dealer.getCurrentBid()==null){
                         send("a Bidding-War has not started yet");
                     }
-                    //check if the bidding is highest enough
-                    else if(bid >= dealer.getCurrentBid().getStartingPrice() && bid>dealer.getCurrentBid().getSellingPrice() ){
-                        //check if the bidder has enough money
-                        if(bid<=wallet){
-                            dealer.makeABid(bid,this);
-                        }
-                        else {
-                            send("you do not have enough money");
-                        }
-
+                    else if(bid < dealer.getCurrentBid().getStartingPrice()){
+                        send("Your bid is less then the starting price");
                     }
-                    else {
+                    else if( bid<=dealer.getCurrentBid().getSellingPrice()){
                         send("Your bid is not the highest");
+                    }
+                    else if(bid>wallet){
+                        send("you do not have enough money");
+                    }
+                    else{
+                        dealer.makeABid(bid,this);
                     }
                 } catch (NumberFormatException ex) {
                     send("invalid input");
                 }
-
-
-
             }
 
         }catch (IOException e){

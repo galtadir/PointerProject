@@ -9,11 +9,13 @@ public class Login extends Thread{
     //count the number of players current in the game for player name
     private int counter;
     private Dealer dealer;
+    private long createdMillis;
 
-    public Login(Dealer dealer){
+    Login(Dealer dealer){
         waitingPlayers = new ArrayList<>();
         counter=1;
         this.dealer = dealer;
+        this.createdMillis = System.currentTimeMillis();
     }
 
 
@@ -25,8 +27,11 @@ public class Login extends Thread{
                 String newPlayerName = "player " + (counter);
                 counter++;
                 Player player = new Player(serverSocket.accept(),dealer , newPlayerName);
+                int age = getAgeInSeconds();
                 //announce about the new player
-                dealer.sendMsgToAllClient(newPlayerName+ " join");
+                String playerMsg = newPlayerName+ " join in "+age + " sec";
+                dealer.sendMsgToAllClient(playerMsg);
+                sendMsgToAllWaiting(playerMsg);
                 waitingPlayers.add(player);
                 player.start();
                 String msg = "You are Player" +player.getNameString();
@@ -37,13 +42,27 @@ public class Login extends Thread{
                     msg+=", we are waiting for a Bidding-War on Item"+dealer.getItemNumber()+ " to end and then you will be joining the game.";
                 }
                 player.send(msg);
+                player.send("You can enter Exit at any time to exit the game");
 
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-    public ArrayList<Player> getWaitingPlayers() {
+
+    private void sendMsgToAllWaiting(String msg){
+        for(Player p: waitingPlayers){
+            p.send(msg);
+        }
+    }
+
+    private int getAgeInSeconds() {
+        long nowMillis = System.currentTimeMillis();
+        return (int)((nowMillis - this.createdMillis) / 1000);
+    }
+
+
+    ArrayList<Player> getWaitingPlayers() {
         return waitingPlayers;
     }
 }
